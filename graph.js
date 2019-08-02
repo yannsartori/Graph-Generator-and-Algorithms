@@ -155,13 +155,18 @@ function drawVertex(vertex, colour, label) {
 }
 function drawDijkstra(labels) {
   pauseRequest = true;
+	
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
   let vertexLabels = labels[0];
   let predLabels = labels[1];
   console.log(vertexLabels);
   console.log(predLabels);
   for (let i = 1; i < vertices.length; i++) {
     if (graph[i][predLabels[i]] !== null && graph[i][predLabels[i]].weight !== 0)
-      drawEdge(vertices[predLabels[i]], vertices[i], graph[predLabels[i]][i].weight, graph[i][predLabels[i]].weight, graph[predLabels[i]][i].directed, true, "green");
+      drawEdge(vertices[i], vertices[predLabels[i]], graph[i][predLabels[i]].weight, graph[predLabels[i]][i].weight, graph[predLabels[i]][i].directed, true, "green");
     else
       drawEdge(vertices[predLabels[i]], vertices[i], graph[predLabels[i]][i].weight, NaN, graph[predLabels[i]][i].directed, false, "green");
   }
