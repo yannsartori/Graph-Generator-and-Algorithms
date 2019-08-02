@@ -1,8 +1,6 @@
 let dumbconsole = function(obj) { //debugging purposes
     console.log(JSON.parse(JSON.stringify(obj)));
 };
-//TODO add algorithms, allow removal of edges... (a bit complicated eh)
-
 /**The following below just deals with creating and drawing a graph. **/
 
 //the following below deals with graph operations (model)
@@ -88,6 +86,7 @@ function graphicalSetUp() {
   draw();
 }
 function draw() {
+  pauseRequest = false;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -114,6 +113,30 @@ function draw() {
   clearVisited(); //next time we draw, dfs isn't showing
   ctx.restore();
 }
+function drawFlows(graph) {
+  pauseRequest = true;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  for (let i = 0; i < graph.length; i++) {
+    for (let j = 0; j < graph[0].length; j++) {
+      if (graph[i][j] !== 0 && graph[j][i] !== 0) { //edge isn't blank
+        if (i > j) {
+          drawEdge(vertices[i], vertices[j], graph[i][j], graph[j][i], true, true); //we'll have to loop the edges
+        }
+      } //the edge isn't blank
+      else if (graph[i][j] !== 0) drawEdge(vertices[i], vertices[j], graph[i][j], NaN, true, false);
+    }
+  }
+  
+  for (let vertex of vertices) drawVertex(vertex);
+  ctx.save();
+  if (specialVertices[SOURCE]) drawVertex(specialVertices[SOURCE], "green");
+  else if (specialVertices[PRIMARY_VERTEX]) drawVertex(specialVertices[PRIMARY_VERTEX], "green");
+  if (specialVertices[SINK]) drawVertex(specialVertices[SINK], "red");
+  ctx.restore();
+}
 function drawVertex(vertex, colour, label) {
   ctx.save();
   ctx.fillStyle = (colour) ? colour : "black";
@@ -131,9 +154,10 @@ function drawVertex(vertex, colour, label) {
   ctx.restore();
 }
 function drawDijkstra(labels) {
+  pauseRequest = true;
   let vertexLabels = labels[0];
-  console.log(vertexLabels);
   let predLabels = labels[1];
+  console.log(vertexLabels);
   console.log(predLabels);
   for (let i = 1; i < vertices.length; i++) {
     if (graph[i][predLabels[i]] !== null && graph[i][predLabels[i]].weight !== 0)
@@ -144,6 +168,7 @@ function drawDijkstra(labels) {
   for (let i = 0; i < vertices.length; i++) drawVertex(vertices[i], "black", vertexLabels[i].value);
 }
 function drawFW(retVal) {
+  pauseRequest = true;
   let distances = retVal[0];
   let negativeCycle = retVal[1];
   let cellSize = 50;
@@ -173,6 +198,8 @@ function drawFW(retVal) {
   ctx.restore();
   if (negativeCycle) alert("A negative cycle was detected!");
 }
+
+let mousePos = []; //used for dynamic drawing of edge uv
 function drawEdge(fromVertex, toVertex, fromWeight, toWeight, directed, looped, style) {
   ctx.save();
   ctx.lineWidth = 6;
@@ -225,11 +252,14 @@ function drawEdge(fromVertex, toVertex, fromWeight, toWeight, directed, looped, 
     } else {
       ctx.beginPath();
       ctx.moveTo(fromVertex.x, fromVertex.y);
-      ctx.lineTo(toVertex.x - (dx * toVertex.radius), toVertex.y - (dy * toVertex.radius)); //draws the line just to the edge of the vertex
+      ctx.lineTo(toVertex.x - (dx * (toVertex.radius*1.1)), toVertex.y - (dy * (toVertex.radius*1.1))); //draws the line just a bit before the edge of the vertex
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(toVertex.x - (dx * (toVertex.radius)), toVertex.y - (dy * (toVertex.radius)));
       let posOfInterest = [toVertex.x - 1.5* (dx * toVertex.radius), toVertex.y - 1.5 * (dy * toVertex.radius)];
       ctx.lineTo(posOfInterest[0] + 0.25*(-dy)*toVertex.radius,  posOfInterest[1] + 0.25*(dx)*toVertex.radius);
       ctx.lineTo(posOfInterest[0] - 0.25*(-dy)*toVertex.radius,  posOfInterest[1] - 0.25*(dx)*toVertex.radius);
-      ctx.lineTo(toVertex.x - (dx * toVertex.radius), toVertex.y - (dy * toVertex.radius));
+      ctx.lineTo(toVertex.x - (dx * toVertex.radius*.86), toVertex.y - (dy * toVertex.radius*.86));
       ctx.fill();
       ctx.stroke();
     }
@@ -255,6 +285,28 @@ function drawEdge(fromVertex, toVertex, fromWeight, toWeight, directed, looped, 
   }
   ctx.restore();
 }
+let pauseRequest = false;
+window.requestAnimationFrame(function callback() {
+  console.log(pauseRequest);
+  if (pauseRequest) {
+    window.requestAnimationFrame(callback);
+    return;
+  }
+  draw(); //so we don't have stray edges
+  if (vertexUPos === -1) window.requestAnimationFrame(callback);
+  else {
+    let rad = 12; //It's "hardcoded" in the sense that its an "arbritray number" but it is the vertex radius. I didn't do vertices[0].radius in case I ever want to have different sized vertices
+    if (keyDown !== "u") {
+      //used so that the arrow head is always directly below mouse (due to how it is drawn)
+      let distance = Math.sqrt(Math.pow(vertices[vertexUPos].x - mousePos[0], 2) + Math.pow(vertices[vertexUPos].y - mousePos[1], 2));
+      let dx = (mousePos[0]-vertices[vertexUPos].x) / distance;
+      let dy = (mousePos[1] - vertices[vertexUPos].y) / distance;
+      drawEdge(vertices[vertexUPos], {x: mousePos[0] + dx*rad, y: mousePos[1] + dy*rad, radius: rad},0 ,0, true, false);
+    }
+    else drawEdge(vertices[vertexUPos], {x: mousePos[0], y: mousePos[1], radius: rad},0 ,0, false, false);
+    window.requestAnimationFrame(callback);
+  }
+});
 
 //The following deals with input (control)
 
@@ -262,8 +314,8 @@ function drawEdge(fromVertex, toVertex, fromWeight, toWeight, directed, looped, 
 let keyDown = null;
 let vertexUPos = -1; //used for creating edges. Since u, v have to be clicked, anything else resets vertexUPos
 let vertexBeingDragged = null;
-function getVertexFromMouse(mouseEvent) { //returns the index at which the vertex was found
-  let mouseX = event.clientX - parseInt(canvas.getBoundingClientRect().left);
+function getVertexFromMouse(event) { //returns the index at which the vertex was found
+    let mouseX = event.clientX - parseInt(canvas.getBoundingClientRect().left);
     let mouseY = event.clientY - parseInt(canvas.getBoundingClientRect().top);
     let i = 0;
     for (i; i < vertices.length; i++) {
@@ -272,15 +324,15 @@ function getVertexFromMouse(mouseEvent) { //returns the index at which the verte
       }
     }
 }
+//for the dynamic drawing
+canvas.addEventListener("mousemove", event => mousePos = [event.clientX - parseInt(canvas.getBoundingClientRect().left), event.clientY - parseInt(canvas.getBoundingClientRect().top)]);
 //double click on blank space adds a vertex. double click on vertex or edge deletes it
 canvas.addEventListener("click", function(event) {
   if (event.detail === 2) {//double-click
     vertexUPos = -1;
-    let mouseX = event.clientX - parseInt(canvas.getBoundingClientRect().left);
-    let mouseY = event.clientY - parseInt(canvas.getBoundingClientRect().top);
     let i = getVertexFromMouse(event);
     if (i < vertices.length) removeVertex(vertices[i].label);
-    else new Vertex(mouseX, mouseY);
+    else new Vertex(mousePos[0], mousePos[1]); //there was no vertex under the mouse found
     draw();
   }
 });
@@ -317,7 +369,6 @@ canvas.addEventListener("click", function(event) {
         }
       }
     }
-    keyDown = null;
     draw();
   }
 });
@@ -349,12 +400,11 @@ canvas.addEventListener("click", function(event) {
         }
       }
     }
-    keyDown = null;
   }
 });
 //connects vertexU to vertexV
 canvas.addEventListener("click", function(event) {
-  if (event.detail === 1 && (event.key !== "s" && event.key !== "t" && !(+event.key > 0))) { //single click, not conflicting with anything
+  if (event.detail === 1 && !vertexBeingDragged && (keyDown !== "s" && keyDown !== "t" && !(+keyDown > 0))) { //single click, not conflicting with anything
     let i = getVertexFromMouse(event);
     if (i < vertices.length) {
       if (vertexUPos === -1) vertexUPos = i; //u wasn't selected
@@ -372,13 +422,22 @@ canvas.addEventListener("click", function(event) {
       }
     } else vertexUPos = -1; //click else where, cancels
   }
-  keyDown = null;
 });
-//deals with dragging vertices
-canvas.addEventListener("mousedown", event => vertexBeingDragged = vertices[getVertexFromMouse(event)]);
-canvas.addEventListener("mouseup", () => vertexBeingDragged = null);
+let clearDrag = false;
+canvas.addEventListener("mousedown", event => {
+  clearDrag = false;
+  setTimeout(() => { //makes a "click and hold" effect
+    if (!clearDrag) {
+      vertexBeingDragged = vertices[getVertexFromMouse(event)]
+    }
+  }, 100);
+});
+canvas.addEventListener("mouseup", () => {
+  clearDrag = true;
+  setTimeout(() => vertexBeingDragged = null, 50); //since click (which controls the uv edge thing) gets triggered after mouse up
+});
 canvas.addEventListener("mousemove", event => moveFunction(event));
-let moveFunction = function(event) { //there was a reason this couldn't be anyonomous...
+let moveFunction = function(event) { //there was a reason this couldn't be anyonomous... I forgot the reason  
   let mouseX = event.clientX - parseInt(canvas.getBoundingClientRect().left);
   let mouseY = event.clientY - parseInt(canvas.getBoundingClientRect().top);
   if (vertexBeingDragged) {
@@ -387,24 +446,20 @@ let moveFunction = function(event) { //there was a reason this couldn't be anyon
     vertexBeingDragged.y = mouseY;
     draw();
   }
-  keyDown = null;
 }
 canvas.addEventListener("keydown", event => keyDown = event.key);
-canvas.addEventListener("keyup", () => keyDown = null);
+canvas.addEventListener("keyup", () => {keyDown = null;});
 
 canvas.addEventListener("keydown", event => { //DFS listener
   if (event.key !== "1") return;
   if (!specialVertices[PRIMARY_VERTEX]) {alert("Choose a primary vertex"); return;}
   depthFirstSearch(specialVertices[PRIMARY_VERTEX]);
-  console.log(vertices);
-  keyDown = null;
 });
 
 canvas.addEventListener("keydown", event => { //dijkstraAlgorithm listener
   if (event.key !== "2") return;
   if (!specialVertices[PRIMARY_VERTEX]) {alert("Choose a primary vertex"); return;}
   dijkstraAlgorithm(specialVertices[PRIMARY_VERTEX]);
-  keyDown = null;
 });
 
 canvas.addEventListener("keydown", event => { //kruskal listener
@@ -412,6 +467,7 @@ canvas.addEventListener("keydown", event => { //kruskal listener
   let kGraph = kruskalsAlgorithm();
   for (let i = 0; i < kGraph.length; i++) {
     for (let j = 0; j < kGraph[i].length; j++) {
+      pauseRequest = true;
       if (kGraph[i][j]) {
         drawEdge(vertices[i], vertices[j], kGraph[i][j].weight, NaN, false, false, "green");
       }
@@ -424,6 +480,11 @@ canvas.addEventListener("keydown", event => {
   if (event.key !== "4") return;
   let retVal = floydWarshall();
   drawFW(retVal);
+});
+canvas.addEventListener("keydown", event => {
+  if (event.key !== "5") return;
+  if (!specialVertices[SOURCE] || !specialVertices[SINK]) {alert("Choose a source and sink vertex"); return;}
+  alert(`The max flow in this graph is ${edmondsKarp()} units and can be sent in the following manner`);
 });
 graphicalSetUp();
 
@@ -438,13 +499,14 @@ function depthFirstSearch(vertex) {
     if (vertices[i] === vertex) {
       _depthFirstSearch(i); //makes the recursion quicker
       draw();
+      pauseRequest = true;
     }
   }
 }
 function _depthFirstSearch(vertexIndex) {
   vertices[vertexIndex].visited = true;
   for (let j = 0; j < graph[vertexIndex].length; j++) {
-    if (graph[vertexIndex][j] && vertices[j].visited === false) _depthFirstSearch(j);
+    if (graph[vertexIndex][j] && !vertices[j].visited) _depthFirstSearch(j);
   }
   return;
 }
@@ -460,7 +522,7 @@ function _dijkstraAlgorithm(vertexIndex) {
   let vertexLabels = [];
   let predLabels = [];
   let minIndex = vertexIndex;
-  for (let i = 0; i < vertices.length; i++) {
+  for (let i = 0; i < vertices.length; i++) { //initalizes the list of vertices with value 0 if source, inf otherwise
     predLabels.push(0);
     vertexLabels.push(new Object());
     vertexLabels[i].done = false;
@@ -471,15 +533,15 @@ function _dijkstraAlgorithm(vertexIndex) {
     let i = minIndex;
     let minVal = Infinity;
     vertexLabels[i].done = true;
-    for (let j = 0; j < graph[i].length; j++) {
+    for (let j = 0; j < graph[i].length; j++) {//goes through neighbours of min vertex
       if (graph[i][j] && !vertexLabels[j].done) {
-        if (vertexLabels[i].value + graph[i][j].weight < vertexLabels[j].value) {
+        if (vertexLabels[i].value + graph[i][j].weight < vertexLabels[j].value) { //if it's cheaper to go min->v than what was u->v, update
           vertexLabels[j].value = vertexLabels[i].value + graph[i][j].weight;
           predLabels[j] = i;
         }
       } 
     }
-    for (let j = 0; j < vertexLabels.length; j++) {
+    for (let j = 0; j < vertexLabels.length; j++) { //find minVal
       if (!vertexLabels[j].done && vertexLabels[j].value < minVal) {
         minVal = vertexLabels[j].value;
         minIndex = j;
@@ -496,23 +558,23 @@ function kruskalsAlgorithm() {
     for (let j = 0; j < vertices.length; j++) {
       kGraph[i].push(null);
       if (graph[i][j]) {
-	if (graph[i][j].directed) {
-          alert("Edges must be undirected");
-	  return;
-	}
-        orderedEdges.push(new Object());
-        orderedEdges[orderedEdges.length - 1].from = i;
-	orderedEdges[orderedEdges.length - 1].to = j;
-	orderedEdges[orderedEdges.length - 1].weight = graph[i][j].weight;
+    	if (graph[i][j].directed) {
+              alert("Edges must be undirected");
+    	  return;
+    	}
+      orderedEdges.push(new Object());
+      orderedEdges[orderedEdges.length - 1].from = i;
+	    orderedEdges[orderedEdges.length - 1].to = j;
+	    orderedEdges[orderedEdges.length - 1].weight = graph[i][j].weight;
       }
     }
   }
   orderedEdges.sort((a, b) => a.weight - b.weight);
   let edgeCount = 0;
 	
-  for (let i = 0; i < orderedEdges.length; i++) {
+  for (let i = 0; i < orderedEdges.length; i++) { //goes through the list of edges in increasing weight
     kGraph[orderedEdges[i].from][orderedEdges[i].to] = new Edge(orderedEdges[i].weight, false);
-    if (containsCycle(kGraph, orderedEdges[i].from)) kGraph[orderedEdges[i].from][orderedEdges[i].to] = null;
+    if (containsCycle(kGraph, orderedEdges[i].from)) kGraph[orderedEdges[i].from][orderedEdges[i].to] = null; //violates tree property
     else {
       edgeCount++;
       if ((edgeCount / 2) + 1 === vertices.length) return kGraph; //we built a spanning tree
@@ -521,14 +583,14 @@ function kruskalsAlgorithm() {
 }
 function containsCycle(adjMatrix, vertexIndex) {
   let hasACycle = false;
-  let _containsCycle = function(_adjMatrix, _vertexIndex, _parentNode) {
+  let _containsCycle = function(_adjMatrix, _vertexIndex, _parentNode) { //recursive dfs with pointers
     if (hasACycle) return;
     vertices[_vertexIndex].visited = true;
     for (let j = 0; j < _adjMatrix[_vertexIndex].length; j++) {
       if (_adjMatrix[_vertexIndex][j] && !vertices[j].visited) _containsCycle(_adjMatrix, j, _vertexIndex);
-      else if (_adjMatrix[_vertexIndex][j] && vertices[j].visited && j !== _parentNode) {
+      else if (_adjMatrix[_vertexIndex][j] && vertices[j].visited && j !== _parentNode) { //we have accessed a repeat edge not the parent i.e. cycle
         hasACycle = true;
-	return;
+	      return;
       }
     }
   }
@@ -549,9 +611,9 @@ function floydWarshall() {
   for (let k = 0; k < vertices.length; k++) {
     for (let i = 0; i < vertices.length; i++) {
       for (let j = 0; j < vertices.length; j++) {
-        if (distances[i][j] > distances[i][k] + distances[k][j]) {
-	  distances[i][j] = distances[i][k] + distances[k][j];
-	}
+        if (distances[i][j] > distances[i][k] + distances[k][j]) { //if it is cheaper to go i->k->j than i->j update
+      	  distances[i][j] = distances[i][k] + distances[k][j];
+      	}
       }
     }
   }
@@ -564,4 +626,63 @@ function floydWarshall() {
   }
   return [distances, negativeCycle];
 }
-	
+function edmondsKarp() {
+  let residualEdgesGraph = [];
+  let sIndex = -1; let tIndex = -1;
+  let maxFlow = 0;
+  for (let i = 0; i < vertices.length; i++) {
+    if (sIndex === -1 && specialVertices[SOURCE] === vertices[i]) sIndex = i;
+    else if (tIndex === -1 && specialVertices[SINK] === vertices[i]) tIndex = i;
+  }
+  for (let i = 0; i < vertices.length; i++) {
+    residualEdgesGraph.push([]);
+    for (let j = 0; j < vertices.length; j++) {
+      if (graph[i][j]) residualEdgesGraph[i].push(graph[i][j].weight);
+      else residualEdgesGraph[i].push(0);
+    }
+  }
+  let breadthFirstSearch = function(graph, startingPointIndex, endingPointIndex) { //bfs that always starts at @param startingPointIndex and ends at @param endingPointIndex
+    let bfsQueue = [];
+    let pointers = new Array(vertices.length);
+    pointers[startingPointIndex] = -1;
+    bfsQueue.push(startingPointIndex);
+    while (bfsQueue.length > 0) {
+      let cur = bfsQueue.shift();
+      vertices[cur].visited = true;
+      for (j = 0; j < graph[cur].length; j++) {
+        if (graph[cur][j] > 0 && !vertices[j].visited) {
+          pointers[j] = cur;
+          bfsQueue.push(j);
+          if (j === endingPointIndex) {
+            bfsQueue = [];
+            break;
+          }
+        }
+      }
+    }
+    clearVisited();
+    return pointers;
+  }
+  
+  
+  while (true) {
+    let stPath = breadthFirstSearch(residualEdgesGraph, sIndex, tIndex);
+    let minFlowVal = Infinity;
+    if (!stPath[tIndex]) break;
+    
+    let i = tIndex;
+    while (stPath[i] !== -1) { //in bfs, t has a valid parent
+      minFlowVal = Math.min(residualEdgesGraph[stPath[i]][i], minFlowVal);
+      i = stPath[i]; //we trace back to s by following the parent pointers
+    }
+    maxFlow += minFlowVal;
+    i = tIndex;
+    while (stPath[i] !== -1) {
+      residualEdgesGraph[stPath[i]][i] -= minFlowVal; //decreases forward edge
+      residualEdgesGraph[i][stPath[i]] += minFlowVal; //increases back edge (i.e. we can push back the flow we pushed forward)
+      i = stPath[i];
+    }
+  }
+  drawFlows(residualEdgesGraph);
+  return maxFlow;
+}
