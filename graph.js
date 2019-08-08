@@ -65,6 +65,12 @@ function addEdge(fromLabel, toLabel, weight, directed) {
   }
   if (!directed) graph[j][i] = new Edge(weight, directed); //adds vu
   graph[i][j] = new Edge(weight, directed); //adds uv
+
+  //does source/sink check
+  if (directed) {
+    if (specialVertices[SOURCE] && toLabel === specialVertices[SOURCE].label) specialVertices[SOURCE] = null;
+    if (specialVertices[SINK] && fromLabel === specialVertices[SINK].label) specialVertices[SINK] = null;
+  }
 }
 function removeEdge(fromLabel, toLabel) {
   addEdge(fromLabel, toLabel, 0, true);
